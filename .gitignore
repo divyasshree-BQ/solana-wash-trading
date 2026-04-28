@@ -1,0 +1,6 @@
+/data
+/funding
+/traders
+.env
+*.env
+article.md

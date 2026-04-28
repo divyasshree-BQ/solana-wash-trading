@@ -1,0 +1,19 @@
+query TopWashTraders($since: DateTime!, $mint: String!) {
+  Solana {
+    DEXTradeByTokens(
+      where: {
+        Block: {Time: {since: $since}},
+        Trade: {Currency: {MintAddress: {is: $mint}}}
+      }
+      orderBy: {descendingByField: "trades"}
+      limit: {count: 30}
+    ) {
+      Trade { Account { Owner } }
+      trades: count
+      buy_usd:  sum(of: Trade_Side_AmountInUSD, if: {Trade: {Side: {Type: {is: buy}}}})
+      sell_usd: sum(of: Trade_Side_AmountInUSD, if: {Trade: {Side: {Type: {is: sell}}}})
+      buys:     count(if: {Trade: {Side: {Type: {is: buy}}}})
+      sells:    count(if: {Trade: {Side: {Type: {is: sell}}}})
+    }
+  }
+}

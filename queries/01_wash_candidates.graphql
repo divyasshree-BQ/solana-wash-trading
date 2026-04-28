@@ -1,0 +1,30 @@
+query WashCandidates($since: DateTime!) {
+  Solana {
+    DEXTradeByTokens(
+      where: {
+        Block: {Time: {since: $since}},
+        Trade: {
+          Currency: {MintAddress: {notIn: [
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+          ]}},
+          Side: {Currency: {MintAddress: {in: [
+            "So11111111111111111111111111111111111111112",
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+          ]}}}
+        }
+      }
+      orderBy: {descendingByField: "trades"}
+      limit: {count: 60}
+    ) {
+      Trade { Currency { Symbol Name MintAddress } }
+      trades:    count
+      traders:   count(distinct: Trade_Account_Owner)
+      volume_usd: sum(of: Trade_Side_AmountInUSD)
+      buyers:    count(distinct: Trade_Account_Owner, if: {Trade: {Side: {Type: {is: buy}}}})
+      sellers:   count(distinct: Trade_Account_Owner, if: {Trade: {Side: {Type: {is: sell}}}})
+    }
+  }
+}

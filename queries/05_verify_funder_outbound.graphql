@@ -1,0 +1,18 @@
+# Independent verification: pull all outbound SOL from a suspected funder
+# in the disbursement window. The unique-amount fingerprint (e.g. all 0.5 SOL)
+# and tight time span confirm a coordinated bot-fleet seeding.
+query VerifyFunder($w: String!, $since: ISO8601DateTime!, $till: ISO8601DateTime!) {
+  solana(network: solana) {
+    transfers(
+      senderAddress: {is: $w}
+      currency: {is: "SOL"}
+      time: {since: $since, till: $till}
+      options: {asc: "block.height", limit: 200, offset: 0}
+    ) {
+      block { height timestamp { iso8601 } }
+      receiver { address }
+      amount
+      transaction { signature }
+    }
+  }
+}

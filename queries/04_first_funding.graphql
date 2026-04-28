@@ -1,0 +1,17 @@
+query FirstFunding($wallets: [String!]!, $since: ISO8601DateTime!) {
+  solana(network: solana) {
+    transfers(
+      receiverAddress: {in: $wallets}
+      currency: {is: "SOL"}
+      amount: {gt: 0}
+      time: {since: $since}
+      options: {asc: "block.height", limit: 2000, limitBy: {each: "receiver.address", limit: 1}}
+    ) {
+      block { height timestamp { iso8601 } }
+      sender { address }
+      receiver { address }
+      amount
+      transaction { signature }
+    }
+  }
+}

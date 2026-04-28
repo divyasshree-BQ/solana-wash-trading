@@ -16,3 +16,5 @@ query VerifyFunder($w: String!, $since: ISO8601DateTime!, $till: ISO8601DateTime
     }
   }
 }
+
+# Run on IDE: https://ide.bitquery.io/Solana-washtrading-verify-query

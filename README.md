@@ -8,7 +8,7 @@ Two phases on two complementary Bitquery surfaces — trades are not transfers, 
 
 ### Phase 1 — Wash-trade detection (Bitquery Crypto Price MCP)
 
-Runs against the Bitquery MCP at **`http://mcp.bitquery.io/`**, which exposes a ClickHouse-backed DEX-trade index for Ethereum, Arbitrum, Base, Matic, Optimism, Binance Smart Chain, Tron, and Solana with 1-second resolution for the last ~30 days.
+Runs against the Bitquery MCP at [http://mcp.bitquery.io/](http://mcp.bitquery.io/), which exposes a ClickHouse-backed DEX-trade index for Ethereum, Arbitrum, Base, Matic, Optimism, Binance Smart Chain, Tron, and Solana with 1-second resolution for the last ~30 days.
 
 1. **Candidate ranking** — `trending_tokens` (or a custom `execute_sql` against `trades_*` / `tokens_*`) over the detection window, scored by trades-per-trader, average trade size, and the fraction of traders that appeared on both sides of the market.
 2. **Top trader extraction** — `top_traders_by_token` for each top-N candidate, filtered to wallets with a round-trip ratio ≥ 0.4 (buy USD ≈ sell USD).

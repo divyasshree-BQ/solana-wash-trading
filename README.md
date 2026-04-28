@@ -13,9 +13,9 @@ Runs against the Bitquery MCP at **`http://mcp.bitquery.io/`**, which exposes a 
 1. **Candidate ranking** — `trending_tokens` (or a custom `execute_sql` against `trades_*` / `tokens_*`) over the detection window, scored by trades-per-trader, average trade size, and the fraction of traders that appeared on both sides of the market.
 2. **Top trader extraction** — `top_traders_by_token` for each top-N candidate, filtered to wallets with a round-trip ratio ≥ 0.4 (buy USD ≈ sell USD).
 
-### Phase 2 — Origin tracing (V1 GraphQL transfers)
+### Phase 2 — Origin tracing (Bitquery Solana transfers API)
 
-Runs against the V1 GraphQL endpoint at **`https://graphql.bitquery.io`** with `solana(network: solana) { transfers(...) }` — the MCP indexes trades, not transfers, so this phase needs the GraphQL surface.
+Runs against the [Bitquery Solana transfers API](https://docs.bitquery.io/v1/docs/Examples/Solana/transfers) at **`https://graphql.bitquery.io`** with `solana(network: solana) { transfers(...) }`. The MCP indexes trades, not transfers, so this phase uses the transfers API directly.
 
 3. **Funding trace (hop 1)** — first inbound SOL transfer for every wash wallet within a configurable lookback window.
 4. **Hop-2 trace** — when the direct senders look like ephemeral one-time intermediates, repeats the funding query on those senders to surface the true root funder.
@@ -64,10 +64,10 @@ Output directories (git-ignored, created on first run):
 ## Requirements
 
 - Python 3.11+
-- `curl` on `PATH` (used to call the V1 GraphQL endpoint)
+- `curl` on `PATH` (used to call the Bitquery Solana transfers API)
 - A [Bitquery](https://bitquery.io) account with:
   - The **Bitquery MCP** at `http://mcp.bitquery.io/` connected to your client (Cowork plugin/connector flow, or any MCP-aware tool). Used by phase 1.
-  - A **bearer token** for the V1 GraphQL endpoint `https://graphql.bitquery.io`. Used by phase 2. The same dashboard issues both — connecting the MCP and obtaining the API key are one-time setup.
+  - A **bearer token** for the [Bitquery Solana transfers API](https://docs.bitquery.io/v1/docs/Examples/Solana/transfers) at `https://graphql.bitquery.io`. Used by phase 2. The same dashboard issues both — connecting the MCP and obtaining the API key are one-time setup.
 
 ## Setup
 
@@ -84,7 +84,7 @@ To use phase 1 from an MCP-aware client, install the Bitquery MCP server once �
 
 ## Running the pipeline
 
-The reference implementation in `scripts/run_pipeline.py` runs all four steps through the V1 GraphQL endpoint (so it works with just the `BQ_TOKEN`). To use the MCP for phase 1, swap the candidate-ranking and top-trader steps for `mcp.trending_tokens` / `mcp.top_traders_by_token` calls; phase 2 stays on the GraphQL endpoint regardless.
+The reference implementation in `scripts/run_pipeline.py` runs all four steps against the Bitquery API directly (so it works with just the `BQ_TOKEN`). To use the MCP for phase 1, swap the candidate-ranking and top-trader steps for `mcp.trending_tokens` / `mcp.top_traders_by_token` calls; phase 2 stays on the Bitquery Solana transfers API regardless.
 
 ```bash
 # use token from .env
@@ -127,14 +127,14 @@ See [`REPORT.md`](REPORT.md) for the full write-up. Summary:
 
 ## Saved queries
 
-Every query the bootstrap pipeline issues is saved under `queries/` so it can be pasted directly into the [Bitquery IDE](https://ide.bitquery.io). When the MCP is wired up, queries 01 and 02 are replaced by `trending_tokens` / `top_traders_by_token` (or a custom `execute_sql` against the trades cube); queries 03–05 remain as-is on the V1 GraphQL endpoint.
+Every query the bootstrap pipeline issues is saved under `queries/` so it can be pasted directly into the [Bitquery IDE](https://ide.bitquery.io). When the MCP is wired up, queries 01 and 02 are replaced by `trending_tokens` / `top_traders_by_token` (or a custom `execute_sql` against the trades cube); queries 03 to 05 remain as-is on the [Bitquery Solana transfers API](https://docs.bitquery.io/v1/docs/Examples/Solana/transfers).
 
 | File | Phase | Purpose |
 |---|---|---|
 | `01_wash_candidates.graphql` | 1 (or use MCP `trending_tokens` / `execute_sql`) | Rank tokens by wash score |
 | `02_top_wash_traders.graphql` | 1 (or use MCP `top_traders_by_token`) | Top 30 wallets per token with buy/sell split |
 | `03_funding_origins.graphql` | 2 | Funding origin aggregation |
-| `04_first_funding.graphql` | 2 | First inbound SOL per wallet (V1, `limitBy`) |
+| `04_first_funding.graphql` | 2 | First inbound SOL per wallet (transfers API, `limitBy`) |
 | `05_verify_funder_outbound.graphql` | 2 | Verify funder's outbound burst |
 
 ## Caveats

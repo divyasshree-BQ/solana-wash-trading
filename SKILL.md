@@ -1,6 +1,6 @@
 ---
 name: solana-wash-trade-investigation
-description: Detect wash-traded Solana tokens in a recent window and trace the funder wallets behind the wash-trade fleets. Two phases that use two different Bitquery datasets in sequence — Phase 1 (wash-trade detection) uses the Bitquery Crypto Price MCP at http://mcp.bitquery.io/ (trending_tokens, top_traders_by_token, execute_sql against ClickHouse trades_*/tokens_*); Phase 2 (origin tracing) uses the V1 solana.transfers GraphQL query at graphql.bitquery.io to walk the funding edges between wallets. Trigger on requests like "find wash trading on Solana", "who is funding wash trading", "trace bot fleets on Solana", "detect coordinated trading", "Bitquery MCP wash detection".
+description: Detect wash-traded Solana tokens in a recent window and trace the funder wallets behind the wash-trade fleets. Two phases that use two different Bitquery datasets in sequence — Phase 1 (wash-trade detection) uses the Bitquery Crypto Price MCP at http://mcp.bitquery.io/ (trending_tokens, top_traders_by_token, execute_sql against ClickHouse trades_*/tokens_*); Phase 2 (origin tracing) uses the Bitquery Solana transfers API (https://docs.bitquery.io/v1/docs/Examples/Solana/transfers) at graphql.bitquery.io to walk the funding edges between wallets. Trigger on requests like "find wash trading on Solana", "who is funding wash trading", "trace bot fleets on Solana", "detect coordinated trading", "Bitquery MCP wash detection".
 ---
 
 # Solana wash-trading investigation via Bitquery
@@ -22,7 +22,7 @@ The investigation has two phases. Each phase uses a different Bitquery surface b
 
 **Phase 1 — wash-trade detection.** Bitquery Crypto Price MCP at `http://mcp.bitquery.io/`. ClickHouse-backed DEX-trade index for Ethereum, Arbitrum, Base, Matic, Optimism, Binance Smart Chain, Tron, and Solana, down to 1-second resolution for the last ~30 days. Used to find wash-traded tokens and rank the wallets running the wash trades.
 
-**Phase 2 — origin tracing.** Bitquery V1 GraphQL endpoint at `https://graphql.bitquery.io` with the `solana(network: solana) { transfers(...) }` query. Indexed native-SOL and SPL transfer ledger. Used to walk the funding edges from each wash wallet back to the wallet that seeded it, then one more hop back to the orchestrator.
+**Phase 2 — origin tracing.** [Bitquery Solana transfers API](https://docs.bitquery.io/v1/docs/Examples/Solana/transfers) at `https://graphql.bitquery.io` with the `solana(network: solana) { transfers(...) }` query. Indexed native-SOL and SPL transfer ledger. Used to walk the funding edges from each wash wallet back to the wallet that seeded it, then one more hop back to the orchestrator.
 
 The MCP is not a fallback for the GraphQL endpoint — they cover different data. Trades are not transfers, transfers are not trades. You will use both in every investigation.
 
@@ -41,7 +41,7 @@ The MCP exposes both purpose-built wrapper tools and a raw SQL surface:
 
 ### Why both surfaces
 
-The MCP indexes DEX trades, OHLCV, and trader rankings. It does **not** index the native-SOL / SPL transfer ledger. Tracing funding edges requires the transfer ledger, which lives behind the V1 GraphQL endpoint. Two datasets, two surfaces, both required.
+The MCP indexes DEX trades, OHLCV, and trader rankings. It does **not** index the native-SOL / SPL transfer ledger. Tracing funding edges requires the transfer ledger, which lives behind the Bitquery Solana transfers API. Two datasets, two surfaces, both required.
 
 ### Authentication
 
@@ -88,7 +88,7 @@ Two phases, two steps each.
 
 **Phase 1 — Wash-trade detection (Bitquery MCP)** finds the wash-traded tokens (1.1) and the wallets running the wash trades on each (1.2).
 
-**Phase 2 — Origin tracing (V1 GraphQL transfers)** finds the seed funder for each wash wallet (2.1) and walks one hop upstream to the orchestrator when the seed funders are ephemeral intermediates (2.2).
+**Phase 2 — Origin tracing (Bitquery Solana transfers API)** finds the seed funder for each wash wallet (2.1) and walks one hop upstream to the orchestrator when the seed funders are ephemeral intermediates (2.2).
 
 ### 1.1 Candidate tokens — Bitquery MCP
 

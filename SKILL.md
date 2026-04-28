@@ -156,9 +156,9 @@ For each row, compute `min(buy_usd, sell_usd) / max(buy_usd, sell_usd)`. Keep wa
 
 If you need fields the wrapper doesn't expose (e.g. first/last trade time per wallet, per-pool split), drop into `execute_sql` against `trades_by_trader_address` and group by `Trader_Address`.
 
-### 2.1 First inbound SOL per wash wallet — V1 GraphQL transfers
+### 2.1 First inbound SOL per wash wallet — Bitquery Solana transfers API
 
-This is where origin tracing begins. The MCP doesn't index transfers, so this step queries the V1 GraphQL endpoint at `https://graphql.bitquery.io`:
+This is where origin tracing begins. The MCP doesn't index transfers, so this step queries the [Bitquery Solana transfers API](https://docs.bitquery.io/v1/docs/Examples/Solana/transfers) at `https://graphql.bitquery.io`:
 
 ```graphql
 query FirstFunding($wallets: [String!]!, $since: ISO8601DateTime!) {
@@ -182,7 +182,7 @@ query FirstFunding($wallets: [String!]!, $since: ISO8601DateTime!) {
 
 The `limitBy.each` clause is the key — it returns one row per distinct receiver, which combined with `asc: "block.height"` is exactly the seed-funding row.
 
-> Gotcha: V1 sort fields must also appear in the projection. Sorting by `transaction.transactionIndex` without selecting it returns `Can't use transaction.transactionIndex in sorting`.
+> Gotcha: in the Bitquery Solana transfers API, sort fields must also appear in the projection. Sorting by `transaction.transactionIndex` without selecting it returns `Can't use transaction.transactionIndex in sorting`.
 
 > Chunk the `wallets` array — batches of 25–30 work well; very large `in` lists time out.
 
@@ -205,13 +205,13 @@ for c in shortlist(candidates):
     per_token[c.symbol] = [r.wallet for r in rows
                            if roundtrip_ratio(r.buy_usd, r.sell_usd) >= 0.4]
 
-# Phase 2 — Origin tracing (V1 GraphQL transfers).
+# Phase 2 — Origin tracing (Bitquery Solana transfers API).
 funding   = gql_v1(FIRST_FUNDING_Q, wallets=flatten(per_token), since="2026-04-21")
 funders   = aggregate_by_sender(funding)
 upstream  = gql_v1(FIRST_FUNDING_Q, wallets=ephemeral_intermediates(funders), since="2026-04-15")
 ```
 
-A complete reference implementation lives at `scripts/run_pipeline.py`. The bootstrap version in this repo runs **all four steps** through the V1 GraphQL endpoint (because the wash-detection step was easier to verify with the same auth surface). When the MCP is wired up, port phase 1 to `mcp.trending_tokens` + `mcp.top_traders_by_token`; phase 2 stays on the GraphQL endpoint regardless.
+A complete reference implementation lives at `scripts/run_pipeline.py`. The bootstrap version in this repo runs **all four steps** against the Bitquery API directly (because the wash-detection step was easier to verify with the same auth surface). When the MCP is wired up, port phase 1 to `mcp.trending_tokens` + `mcp.top_traders_by_token`; phase 2 stays on the Bitquery Solana transfers API regardless.
 
 ## What "good" output looks like
 
@@ -240,6 +240,6 @@ Save:
 
 - **MCP tool returns `requires authentication`** — the Bitquery MCP at `http://mcp.bitquery.io/` isn't connected for this session. Ask the user to reconnect the connector, then retry. If they need the data right now, fall through to the GraphQL endpoint with their API key.
 - **`execute_sql` errors on column names** — the MCP description lists table groups (`trades_*`, `pairs_*`, `tokens_*`, `currencies_*`) but exact column names vary by account. Run `SHOW TABLES LIKE 'trades_%'` and `DESCRIBE trades_by_token_address` first, then customize the SQL.
-- **`Cannot query field "solana"`** — you're hitting the V2 GraphQL endpoint (`streaming.bitquery.io`) with a V1 query. Use lowercase `solana` only at `graphql.bitquery.io`. The transfer-trace step needs V1.
-- **Empty arrays from V2 `Transfers` for known-active wallets** — V2 native-SOL representation differs by cube. The V1 `solana.transfers` shape used in step 2.1 is the one that works for SOL flows.
-- **`null` aggregations on V1** — count-of-distinct fields like `count(uniq: senders)` aren't supported on the V1 transfers reducer. Either pull rows and aggregate client-side, or do the aggregation in the MCP via `execute_sql`.
+- **`Cannot query field "solana"`** — you're hitting the wrong endpoint. The Bitquery Solana transfers API uses lowercase `solana` and lives at `graphql.bitquery.io`. The streaming endpoint at `streaming.bitquery.io/graphql` uses capital `Solana` and a different schema.
+- **Empty arrays from `streaming.bitquery.io/graphql` `Transfers` for known-active wallets** — that schema's native-SOL representation differs by cube. Use the Bitquery Solana transfers API in step 2.1 for SOL flows.
+- **`null` aggregations on the transfers API** — count-of-distinct fields like `count(uniq: senders)` aren't supported on the transfers reducer. Either pull rows and aggregate client-side, or do the aggregation in the MCP via `execute_sql`.
